@@ -20,15 +20,15 @@ import java.math.{BigDecimal => JBigDecimal}
 import java.sql.Timestamp
 import java.util.{TimeZone, List => JList, Map => JMap}
 import java.util.Arrays.{asList => asJList}
-
 import scala.collection.JavaConverters._
-
 import io.delta.standalone.data.{RowRecord => JRowRecord}
 import io.delta.standalone.DeltaLog
 import io.delta.standalone.internal.sources.StandaloneHadoopConf
 import io.delta.standalone.internal.util.GoldenTableUtils._
 import io.delta.standalone.types.{DateType, StructField, StructType, TimestampType}
 import org.apache.hadoop.conf.Configuration
+
+import scala.collection.mutable.ListBuffer
 // scalastyle:off funsuite
 import org.scalatest.FunSuite
 
@@ -299,5 +299,34 @@ class DeltaDataReaderSuite extends FunSuite {
 
       assert(row.getSchema == expectedSchema)
     }
+  }
+
+  test("Read only the partition data") {
+    withLogForGoldenTable("snapshot-partition-data") { log =>
+      val par1 = ("partition", "1")
+      val par2 = ("partition", "2")
+
+      def readWithPartition(partition: (String, String)*): List[JRowRecord] = {
+        val recordIter = log.snapshot().open(partition: _*)
+        val rows: ListBuffer[JRowRecord] = ListBuffer.empty
+        while (recordIter.hasNext) {
+          rows.append(recordIter.next())
+        }
+        rows.toList
+      }
+
+      // Reading data from partition=1
+      val firstPartitionData = readWithPartition(par1)
+      assert(firstPartitionData.size === 1)
+
+      // Reading data from partition=2
+      val secondPartitionData = readWithPartition(par2)
+      assert(secondPartitionData.size === 1)
+
+      // Reading all data
+      val allData = readWithPartition()
+      assert(allData.size === 2)
+    }
+
   }
 }

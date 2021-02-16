@@ -69,6 +69,18 @@ private[internal] class SnapshotImpl(
       // the time zone ID if it exists, else null
       hadoopConf.get(StandaloneHadoopConf.PARQUET_DATA_TIME_ZONE_ID))
 
+  override def open(nestedPartition: (String, String)*): CloseableIterator[RowParquetRecordJ] = {
+    if (nestedPartition.isEmpty) return open()
+    CloseableParquetDataIterator(
+      allFilesScala
+        .filter(_.partitionValues.toList == nestedPartition.toList)
+        .map(_.path)
+        .map(FileNames.absolutePath(deltaLog.dataPath, _).toString),
+      getMetadata.getSchema,
+      // the time zone ID if it exists, else null
+      hadoopConf.get(StandaloneHadoopConf.PARQUET_DATA_TIME_ZONE_ID))
+  }
+
   ///////////////////////////////////////////////////////////////////////////
   // Internal-Only Methods
   ///////////////////////////////////////////////////////////////////////////
